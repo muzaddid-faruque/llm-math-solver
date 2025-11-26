@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# dotenv
+.env
+
+# Virtual environments
+.venv/
+venv/
+
+# Byte-compiled / caches
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs, coverage, test
+*.log
+coverage/
+htmlcov/
+.pytest_cache/
+
+# Packages
+pip-wheel-metadata/
+*.egg-info/
+build/
+dist/
+
+# Node (frontend)
+node_modules/
+dist/
+build/
+
+# Secrets and keys
+*.pem
+*.key
