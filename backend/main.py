@@ -1,10 +1,26 @@
 import os, base64, json
 from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import requests
 
 load_dotenv()
 app = FastAPI()
+
+# ---- CORS (allow requests from your Expo dev server / phone)
+origins = [
+    "http://localhost",
+    "http://localhost:19006",
+    "http://127.0.0.1",
+    # add your PC LAN IP (example: "http://192.168.0.101")
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # during development it's OK to use "*" — tighten this for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
