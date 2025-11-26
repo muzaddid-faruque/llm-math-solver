@@ -5,6 +5,17 @@
 
 Minimal project to extract and solve math problems from images using LLM APIs.
 
+## Table of Contents
+
+- [Structure](#structure)
+- [Setup](#setup)
+- [Endpoints](#endpoints)
+- [License](#license)
+- [Continuous Integration (CI)](#continuous-integration-ci)
+- [Security](#security)
+- [Notes](#notes)
+
+
 ## Structure
 
 - `backend/` — FastAPI backend that accepts an image and forwards it to Perplexity or Gemini.
