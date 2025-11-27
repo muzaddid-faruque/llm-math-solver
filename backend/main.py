@@ -22,6 +22,8 @@ app.add_middleware(
 
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # override with a vision-capable model if you have one
 
 LLM_PROMPT = """You are a careful math tutor. The user provided an image of a math problem.
 Return ONLY a single JSON object with keys: "latex", "answer", "steps", "notes".
@@ -184,6 +186,68 @@ async def solve_gemini(file: UploadFile = File(...)):
     return {"raw": raw_text, "parsed": parsed}
 
 # ---------------------------
+# New: ChatGPT / OpenAI endpoint
+# ---------------------------
+@app.post("/solve-chatgpt")
+async def solve_chatgpt(file: UploadFile = File(...)):
+    """Send image + prompt to OpenAI Chat Completions and extract JSON from the assistant reply."""
+    if not OPENAI_API_KEY:
+        return {"error": "OPENAI_API_KEY not set in .env"}
+    try:
+        img_bytes = await file.read()
+        b64 = base64.b64encode(img_bytes).decode("utf-8")
+        data_uri = f"data:{file.content_type};base64,{b64}"
+    except Exception as e:
+        return {"error": "Failed reading uploaded file", "detail": str(e)}
+
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    # Build messages. We put the prompt in system and pass the image data URI in user content
+    # If you have a vision-capable OpenAI model, set OPENAI_MODEL accordingly.
+    messages = [
+        {"role": "system", "content": LLM_PROMPT},
+        {
+            "role": "user",
+            # We send the image as a data URI and a short instruction to the model.
+            "content": f"Image data (base64 data URI):\n{data_uri}\n\nPlease extract the math problem from the image and return ONLY the single JSON object as specified by the system prompt."
+        }
+    ]
+
+    body = {
+        "model": OPENAI_MODEL,
+        "messages": messages,
+        "max_tokens": 1500,
+        "temperature": 0.0,
+    }
+
+    try:
+        r = requests.post(url, headers=headers, json=body, timeout=120)
+        r.raise_for_status()
+        j = r.json()
+        # get assistant text (compatible with standard Chat Completions responses)
+        assistant_text = None
+        try:
+            assistant_text = j["choices"][0]["message"]["content"]
+        except Exception:
+            assistant_text = None
+
+        parsed = None
+        if assistant_text:
+            parsed = try_extract_json_from_text(assistant_text)
+        # fallback: try to find json inside full response text
+        if not parsed:
+            parsed = try_extract_json_from_text(json.dumps(j))
+        return {"raw": json.dumps(j), "parsed": parsed}
+    except requests.HTTPError as he:
+        return {"error": "OpenAI HTTP error", "detail": str(he), "response_text": getattr(he.response, "text", None)}
+    except Exception as e:
+        return {"error": "OpenAI call failed", "detail": str(e)}
+
+# ---------------------------
 @app.get("/")
 async def root():
-    return {"message": "Backend running. POST to /solve-gemini or /solve-perplexity"}
+    return {"message": "Backend running. POST to /solve-gemini or /solve-perplexity or /solve-chatgpt"}

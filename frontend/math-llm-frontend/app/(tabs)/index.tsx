@@ -359,6 +359,11 @@ export default function IndexScreen() {
         <Button title="Solve with Perplexity" onPress={() => send("/solve-perplexity")} disabled={loading} />
       </View>
 
+      {/* NEW: Solve with ChatGPT/OpenAI */}
+      <View style={{ marginTop: 8 }}>
+        <Button title="Solve with ChatGPT" onPress={() => send("/solve-chatgpt")} disabled={loading} />
+      </View>
+
       {loading && <ActivityIndicator size="large" style={{ marginTop: 18 }} />}
 
       {result && (
