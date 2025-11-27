@@ -11,7 +11,7 @@ import requests
 load_dotenv()
 app = FastAPI()
 
-# Development CORS
+# Development CORS - tighten for production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,6 +33,7 @@ Do not add any text outside the JSON.
 """
 
 def try_extract_json_from_text(text: str) -> Optional[Any]:
+    """Try to find and parse the first JSON object inside text. Returns Python object or None."""
     if not text or not isinstance(text, str):
         return None
     start = text.find("{")
@@ -49,7 +50,7 @@ def try_extract_json_from_text(text: str) -> Optional[Any]:
             return None
 
 # ---------------------------
-# Perplexity endpoint (unchanged)
+# Perplexity endpoint (Sonar) - image inside messages[].content as data URI
 # ---------------------------
 @app.post("/solve-perplexity")
 async def solve_perplexity(file: UploadFile = File(...)):
@@ -58,6 +59,7 @@ async def solve_perplexity(file: UploadFile = File(...)):
     try:
         img = await file.read()
         b64 = base64.b64encode(img).decode("utf-8")
+        data_uri = f"data:{file.content_type};base64,{b64}"
 
         url = "https://api.perplexity.ai/chat/completions"
         headers = {
@@ -65,16 +67,22 @@ async def solve_perplexity(file: UploadFile = File(...)):
             "Content-Type": "application/json",
         }
 
+        # Choose "sonar-pro" if available to you, otherwise "sonar"
         body = {
-            "model": "pplx-sonar",
-            "messages": [{"role": "user", "content": LLM_PROMPT}],
-            "attachments": [
-                {"type": "image", "mime_type": file.content_type, "data": b64, "filename": file.filename}
+            "model": "sonar-pro",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": LLM_PROMPT},
+                        {"type": "image_url", "image_url": {"url": data_uri}}
+                    ]
+                }
             ],
             "max_tokens": 1500
         }
 
-        r = requests.post(url, headers=headers, json=body, timeout=90)
+        r = requests.post(url, headers=headers, json=body, timeout=120)
         r.raise_for_status()
         text = r.text
         parsed = None
@@ -89,7 +97,7 @@ async def solve_perplexity(file: UploadFile = File(...)):
         return {"error": "Perplexity call failed", "detail": str(e)}
 
 # ---------------------------
-# Gemini endpoint (image-capable model)
+# Gemini endpoint (using google-genai types.Part.from_bytes)
 # ---------------------------
 @app.post("/solve-gemini")
 async def solve_gemini(file: UploadFile = File(...)):
@@ -101,7 +109,7 @@ async def solve_gemini(file: UploadFile = File(...)):
     except Exception as e:
         return {"error": "Failed reading uploaded file", "detail": str(e)}
 
-    # Import SDK and types
+    # Import SDK and Part helper
     try:
         from google import genai
         from google.genai import types
@@ -113,7 +121,7 @@ async def solve_gemini(file: UploadFile = File(...)):
     except Exception as e:
         return {"error": "Failed to initialize genai.Client", "detail": str(e)}
 
-    # Create a Part from bytes (do not pass filename if not supported)
+    # Create Part from bytes - do not pass filename if your SDK rejects it
     try:
         image_part = types.Part.from_bytes(data=img_bytes, mime_type=file.content_type)
     except TypeError:
@@ -124,20 +132,17 @@ async def solve_gemini(file: UploadFile = File(...)):
     except Exception as e:
         return {"error": "Failed to create types.Part from bytes", "detail": str(e)}
 
-    # Use one of the image-capable models you listed
-    model_name = "models/gemini-2.5-flash-image"  # <--- chosen model (change if you prefer another)
+    # Pick an image-capable model available in your account
+    model_name = "models/gemini-2.5-flash-image"
 
     contents = [image_part, LLM_PROMPT]
 
-    # Try calling with config; fallback to minimal call
+    # Try calling with config, fallback to minimal call shape
     try:
         resp = client.models.generate_content(
             model=model_name,
             contents=contents,
-            config={
-                "temperature": 0.2,
-                "max_output_tokens": 1500,
-            },
+            config={"temperature": 0.2, "max_output_tokens": 1500},
         )
     except TypeError:
         try:
@@ -147,7 +152,7 @@ async def solve_gemini(file: UploadFile = File(...)):
     except Exception as e:
         return {"error": "Gemini generate_content call failed", "detail": str(e)}
 
-    # Extract text from response robustly
+    # Extract textual output robustly
     raw_text = None
     parsed = None
     try:
