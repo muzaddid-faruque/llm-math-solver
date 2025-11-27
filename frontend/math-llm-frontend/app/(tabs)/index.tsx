@@ -16,7 +16,7 @@ export default function IndexScreen() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // ✔ DEFAULT: localhost for PC testing
+  // Localhost backend for PC testing
   const [backendUrl, setBackendUrl] = useState("http://localhost:8000");
 
   const pickImage = async () => {
@@ -43,30 +43,59 @@ export default function IndexScreen() {
     setLoading(true);
     try {
       const uri = image.uri;
-      const filename = uri.split("/").pop();
+      const filename = uri.split("/").pop() || "photo.jpg";
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : "image/jpeg";
 
       const form = new FormData();
-      form.append(
-        "file",
-        {
-          uri: Platform.OS === "android" ? uri : uri.replace("file://", ""),
-          name: filename,
-          type,
-        } as any
-      );
 
-      const response = await fetch(backendUrl + path, {
+      if (Platform.OS === "web") {
+        // ON WEB → Convert URI to Blob, then File
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const file = new File([blob], filename, { type: blob.type || type });
+        form.append("file", file);
+      } else {
+        // ON NATIVE → Standard file upload
+        form.append(
+          "file",
+          {
+            uri: Platform.OS === "android" ? uri : uri.replace("file://", ""),
+            name: filename,
+            type,
+          } as any
+        );
+      }
+
+      const res = await fetch(backendUrl + path, {
         method: "POST",
         body: form,
       });
 
-      const json = await response.json();
-      setResult(json);
+      // --- Robust JSON parsing ---
+      let parsed;
+      try {
+        parsed = await res.json();
+      } catch {
+        const txt = await res.text();
+        try {
+          const start = txt.indexOf("{");
+          const end = txt.lastIndexOf("}");
+          parsed =
+            start !== -1 && end !== -1 && end > start
+              ? JSON.parse(txt.slice(start, end + 1))
+              : { raw_text: txt };
+        } catch {
+          parsed = { raw_text: txt };
+        }
+      }
+      // -----------------------------
+
+      setResult(parsed);
     } catch (err: any) {
-      alert("Error: " + err.message);
+      alert("Error: " + (err.message || err));
     }
+
     setLoading(false);
   };
 
