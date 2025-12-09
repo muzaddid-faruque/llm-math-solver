@@ -2,28 +2,51 @@
 import os
 import base64
 import json
+import logging
 from typing import Optional, Any
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import requests
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 app = FastAPI()
 
-# Development CORS - tighten for production
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS Configuration - Use environment variable for allowed origins
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:19006").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type"],
 )
 
+# File upload validation constants
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_MIMETYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"}
+
+# API Configuration
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # override with a vision-capable model if you have one
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
 
 LLM_PROMPT = """You are a careful math tutor. The user provided an image of a math problem.
 Return ONLY a single JSON object with keys: "latex", "answer", "steps", "notes".
@@ -51,15 +74,74 @@ def try_extract_json_from_text(text: str) -> Optional[Any]:
         except Exception:
             return None
 
+
+async def validate_and_read_image(file: UploadFile) -> bytes:
+    """
+    Validate uploaded image file and return its contents.
+
+    Args:
+        file: The uploaded file to validate
+
+    Returns:
+        bytes: The file contents if valid
+
+    Raises:
+        HTTPException: If file is invalid (wrong type, too large, or empty)
+    """
+    # Check mimetype
+    if file.content_type not in ALLOWED_MIMETYPES:
+        logger.warning(f"Invalid file type attempted: {file.content_type}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Only {', '.join(ALLOWED_MIMETYPES)} are allowed."
+        )
+
+    # Read with size limit (read one extra byte to detect oversized files)
+    try:
+        contents = await file.read(MAX_FILE_SIZE + 1)
+    except Exception as e:
+        logger.error(f"Error reading uploaded file: {e}")
+        raise HTTPException(status_code=400, detail="Failed to read uploaded file")
+
+    # Check file size
+    if len(contents) > MAX_FILE_SIZE:
+        logger.warning(f"Oversized file attempted: {len(contents)} bytes")
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB."
+        )
+
+    # Check if file is empty
+    if len(contents) == 0:
+        logger.warning("Empty file uploaded")
+        raise HTTPException(status_code=400, detail="Empty file. Please upload a valid image.")
+
+    logger.info(f"File validated: {file.content_type}, {len(contents)} bytes")
+    return contents
+
 # ---------------------------
 # Perplexity endpoint (Sonar) - image inside messages[].content as data URI
 # ---------------------------
 @app.post("/solve-perplexity")
-async def solve_perplexity(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def solve_perplexity(request: Request, file: UploadFile = File(...)):
+    """
+    Solve a math problem using Perplexity Sonar API.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+        file: Image file containing the math problem
+
+    Returns:
+        dict: Contains 'raw' response and 'parsed' JSON result
+    """
     if not PERPLEXITY_API_KEY:
-        return {"error": "PERPLEXITY_API_KEY not set in .env"}
+        logger.error("PERPLEXITY_API_KEY not configured")
+        raise HTTPException(status_code=500, detail="API key not configured")
+
     try:
-        img = await file.read()
+        # Validate and read image
+        img = await validate_and_read_image(file)
         b64 = base64.b64encode(img).decode("utf-8")
         data_uri = f"data:{file.content_type};base64,{b64}"
 
@@ -69,7 +151,6 @@ async def solve_perplexity(file: UploadFile = File(...)):
             "Content-Type": "application/json",
         }
 
-        # Choose "sonar-pro" if available to you, otherwise "sonar"
         body = {
             "model": "sonar-pro",
             "messages": [
@@ -84,7 +165,8 @@ async def solve_perplexity(file: UploadFile = File(...)):
             "max_tokens": 1500
         }
 
-        r = requests.post(url, headers=headers, json=body, timeout=120)
+        logger.info("Sending request to Perplexity API")
+        r = requests.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
         r.raise_for_status()
         text = r.text
         parsed = None
@@ -92,55 +174,87 @@ async def solve_perplexity(file: UploadFile = File(...)):
             parsed = r.json()
         except Exception:
             parsed = try_extract_json_from_text(text)
+
+        logger.info("Successfully received response from Perplexity")
         return {"raw": text, "parsed": parsed}
+
+    except HTTPException:
+        raise
+    except requests.Timeout:
+        logger.error("Perplexity API request timeout")
+        raise HTTPException(status_code=504, detail="Request timeout. Please try again.")
     except requests.HTTPError as he:
-        return {"error": "Perplexity HTTP error", "detail": str(he), "response_text": getattr(he.response, "text", None)}
+        logger.error(f"Perplexity HTTP error: {he.response.status_code}")
+        raise HTTPException(
+            status_code=502,
+            detail="External API error. Please try again later."
+        )
     except Exception as e:
-        return {"error": "Perplexity call failed", "detail": str(e)}
+        logger.error(f"Unexpected error in solve_perplexity: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # ---------------------------
 # Gemini endpoint (using google-genai types.Part.from_bytes)
 # ---------------------------
 @app.post("/solve-gemini")
-async def solve_gemini(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def solve_gemini(request: Request, file: UploadFile = File(...)):
+    """
+    Solve a math problem using Google Gemini API.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+        file: Image file containing the math problem
+
+    Returns:
+        dict: Contains 'raw' response and 'parsed' JSON result
+    """
     if not GEMINI_API_KEY:
-        return {"error": "GEMINI_API_KEY not set in .env"}
+        logger.error("GEMINI_API_KEY not configured")
+        raise HTTPException(status_code=500, detail="API key not configured")
 
     try:
-        img_bytes = await file.read()
+        # Validate and read image
+        img_bytes = await validate_and_read_image(file)
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": "Failed reading uploaded file", "detail": str(e)}
+        logger.error(f"Failed reading uploaded file: {e}")
+        raise HTTPException(status_code=400, detail="Failed to read uploaded file")
 
     # Import SDK and Part helper
     try:
         from google import genai
         from google.genai import types
     except Exception as e:
-        return {"error": "google-genai SDK not installed or importable", "detail": str(e)}
+        logger.error(f"google-genai SDK not available: {e}")
+        raise HTTPException(status_code=500, detail="Server configuration error")
 
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
     except Exception as e:
-        return {"error": "Failed to initialize genai.Client", "detail": str(e)}
+        logger.error(f"Failed to initialize genai.Client: {e}")
+        raise HTTPException(status_code=500, detail="API initialization error")
 
-    # Create Part from bytes - do not pass filename if your SDK rejects it
+    # Create Part from bytes
     try:
         image_part = types.Part.from_bytes(data=img_bytes, mime_type=file.content_type)
     except TypeError:
         try:
             image_part = types.Part.from_bytes(img_bytes, file.content_type)
         except Exception as e:
-            return {"error": "Failed to create types.Part from bytes (fallback)", "detail": str(e)}
+            logger.error(f"Failed to create types.Part: {e}")
+            raise HTTPException(status_code=500, detail="Image processing error")
     except Exception as e:
-        return {"error": "Failed to create types.Part from bytes", "detail": str(e)}
+        logger.error(f"Failed to create types.Part: {e}")
+        raise HTTPException(status_code=500, detail="Image processing error")
 
-    # Pick an image-capable model available in your account
     model_name = "models/gemini-2.5-flash-image"
-
     contents = [image_part, LLM_PROMPT]
 
     # Try calling with config, fallback to minimal call shape
     try:
+        logger.info("Sending request to Gemini API")
         resp = client.models.generate_content(
             model=model_name,
             contents=contents,
@@ -150,9 +264,11 @@ async def solve_gemini(file: UploadFile = File(...)):
         try:
             resp = client.models.generate_content(model=model_name, contents=contents)
         except Exception as e:
-            return {"error": "Gemini generate_content call failed (fallback)", "detail": str(e)}
+            logger.error(f"Gemini API call failed: {e}", exc_info=True)
+            raise HTTPException(status_code=502, detail="External API error")
     except Exception as e:
-        return {"error": "Gemini generate_content call failed", "detail": str(e)}
+        logger.error(f"Gemini API call failed: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail="External API error")
 
     # Extract textual output robustly
     raw_text = None
@@ -183,22 +299,39 @@ async def solve_gemini(file: UploadFile = File(...)):
             raw_text = str(resp)
 
     parsed = try_extract_json_from_text(raw_text)
+    logger.info("Successfully received response from Gemini")
     return {"raw": raw_text, "parsed": parsed}
 
 # ---------------------------
 # New: ChatGPT / OpenAI endpoint
 # ---------------------------
 @app.post("/solve-chatgpt")
-async def solve_chatgpt(file: UploadFile = File(...)):
-    """Send image + prompt to OpenAI Chat Completions and extract JSON from the assistant reply."""
+@limiter.limit("10/minute")
+async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
+    """
+    Solve a math problem using OpenAI ChatGPT API.
+
+    Args:
+        request: FastAPI request object (required for rate limiting)
+        file: Image file containing the math problem
+
+    Returns:
+        dict: Contains 'raw' response and 'parsed' JSON result
+    """
     if not OPENAI_API_KEY:
-        return {"error": "OPENAI_API_KEY not set in .env"}
+        logger.error("OPENAI_API_KEY not configured")
+        raise HTTPException(status_code=500, detail="API key not configured")
+
     try:
-        img_bytes = await file.read()
+        # Validate and read image
+        img_bytes = await validate_and_read_image(file)
         b64 = base64.b64encode(img_bytes).decode("utf-8")
         data_uri = f"data:{file.content_type};base64,{b64}"
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": "Failed reading uploaded file", "detail": str(e)}
+        logger.error(f"Failed reading uploaded file: {e}")
+        raise HTTPException(status_code=400, detail="Failed to read uploaded file")
 
     url = "https://api.openai.com/v1/chat/completions"
     headers = {
@@ -206,14 +339,13 @@ async def solve_chatgpt(file: UploadFile = File(...)):
         "Content-Type": "application/json",
     }
 
-    # Build messages. We put the prompt in system and pass the image data URI in user content
-    # If you have a vision-capable OpenAI model, set OPENAI_MODEL accordingly.
     messages = [
         {"role": "system", "content": LLM_PROMPT},
         {
             "role": "user",
-            # We send the image as a data URI and a short instruction to the model.
-            "content": f"Image data (base64 data URI):\n{data_uri}\n\nPlease extract the math problem from the image and return ONLY the single JSON object as specified by the system prompt."
+            "content": f"Image data (base64 data URI):\n{data_uri}\n\n" +
+                      "Please extract the math problem from the image and return ONLY " +
+                      "the single JSON object as specified by the system prompt."
         }
     ]
 
@@ -225,10 +357,11 @@ async def solve_chatgpt(file: UploadFile = File(...)):
     }
 
     try:
-        r = requests.post(url, headers=headers, json=body, timeout=120)
+        logger.info("Sending request to OpenAI API")
+        r = requests.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
         r.raise_for_status()
         j = r.json()
-        # get assistant text (compatible with standard Chat Completions responses)
+
         assistant_text = None
         try:
             assistant_text = j["choices"][0]["message"]["content"]
@@ -238,14 +371,24 @@ async def solve_chatgpt(file: UploadFile = File(...)):
         parsed = None
         if assistant_text:
             parsed = try_extract_json_from_text(assistant_text)
-        # fallback: try to find json inside full response text
         if not parsed:
             parsed = try_extract_json_from_text(json.dumps(j))
+
+        logger.info("Successfully received response from OpenAI")
         return {"raw": json.dumps(j), "parsed": parsed}
+
+    except requests.Timeout:
+        logger.error("OpenAI API request timeout")
+        raise HTTPException(status_code=504, detail="Request timeout. Please try again.")
     except requests.HTTPError as he:
-        return {"error": "OpenAI HTTP error", "detail": str(he), "response_text": getattr(he.response, "text", None)}
+        logger.error(f"OpenAI HTTP error: {he.response.status_code}")
+        raise HTTPException(
+            status_code=502,
+            detail="External API error. Please try again later."
+        )
     except Exception as e:
-        return {"error": "OpenAI call failed", "detail": str(e)}
+        logger.error(f"Unexpected error in solve_chatgpt: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # ---------------------------
 @app.get("/")
