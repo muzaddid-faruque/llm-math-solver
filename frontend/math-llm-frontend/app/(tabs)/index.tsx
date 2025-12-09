@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { WebView } from "react-native-webview";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import katex from "katex";
 
 type ImageAsset = {
@@ -523,252 +525,485 @@ export default function IndexScreen() {
 
   // ==== UI ====
   return (
-    <ScrollView contentContainerStyle={{ padding: 18 }}>
-      <Text style={styles.title}>LLM Math Solver — Pretty View</Text>
-
-      <Text style={{ marginBottom: 6 }}>Backend URL:</Text>
-      <TextInput
-        value={backendUrl}
-        onChangeText={setBackendUrl}
-        style={styles.input}
-      />
-
-      <Button title="Pick an Image From PC" onPress={pickImage} />
-
-      {image && (
-        <Image
-          source={{ uri: image.uri }}
-          style={{
-            width: "100%",
-            height: 220,
-            marginTop: 12,
-            borderRadius: 8,
-          }}
-          resizeMode="contain"
-        />
-      )}
-
-      <View style={{ marginTop: 12 }}>
-        <Button
-          title="Solve with Gemini"
-          onPress={() => send("/solve-gemini")}
-          disabled={loading}
-        />
-      </View>
-      <View style={{ marginTop: 8 }}>
-        <Button
-          title="Solve with Perplexity"
-          onPress={() => send("/solve-perplexity")}
-          disabled={loading}
-        />
-      </View>
-      <View style={{ marginTop: 8 }}>
-        <Button
-          title="Solve with ChatGPT"
-          onPress={() => send("/solve-chatgpt")}
-          disabled={loading}
-        />
-      </View>
-
-      {loading && (
-        <ActivityIndicator size="large" style={{ marginTop: 18 }} />
-      )}
-
-      {result && (
-        <View
-          style={{
-            backgroundColor: "#fff",
-            padding: 14,
-            marginTop: 16,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={{ color: "#666", marginBottom: 4 }}>Expression</Text>
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: "#ddd",
-              borderRadius: 8,
-              paddingVertical: 10,
-              paddingHorizontal: 10,
-              marginBottom: 10,
-              minHeight: 50,
-              justifyContent: "center",
-            }}
+    <LinearGradient
+      colors={['#0f0f23', '#1a1a2e', '#16213e']}
+      style={{ flex: 1 }}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
           >
-            {result.latex ? (
-              Platform.OS === "web" ? (
-                renderLatexWeb(result.latex, {
-                  textAlign: "center",
-                  fontSize: 20,
-                  width: "100%",
-                }, true) // Use display mode for better rendering
-              ) : (
-                <View style={{ height: 60, width: "100%" }}>
-                  <WebView
-                    originWhitelist={["*"]}
-                    source={{ html: buildKaTeXHtml(result.latex, true) }}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              )
-            ) : (
-              <Text style={{ color: "#333" }}>
-                {result.notes ?? "Expression"}
-              </Text>
-            )}
+            <MaterialCommunityIcons name="math-integral-box" size={40} color="#fff" />
+            <Text style={styles.heroTitle}>LLM Math Solver</Text>
+            <Text style={styles.heroSubtitle}>Solve any math problem with AI</Text>
+          </LinearGradient>
+        </View>
+
+        {/* Backend URL Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="server-outline" size={20} color="#a0aec0" />
+            <Text style={styles.cardLabel}>Backend URL</Text>
           </View>
+          <TextInput
+            value={backendUrl}
+            onChangeText={setBackendUrl}
+            style={styles.modernInput}
+            placeholderTextColor="#718096"
+            placeholder="http://localhost:8000"
+          />
+        </View>
 
-          <Text style={{ fontWeight: "700", marginBottom: 8 }}>
-            Let's solve it step-by-step:
-          </Text>
-
-          {result.steps && result.steps.length ? (
-            <View style={{ marginBottom: 12 }}>
-              {result.steps.map((s, idx) => {
-                const stepText = s ?? "";
-                let displayContent = stepText.trim();
-
-                // Clean up weird characters
-                displayContent = displayContent.replace(/√/g, '\\sqrt');
-                displayContent = displayContent.replace(/�/g, '');
-
-                return (
-                  <View
-                    key={idx}
-                    style={{ marginBottom: 10, paddingLeft: 10 }}
-                  >
-                    {Platform.OS === "web" ? (
-                      <div style={{ textAlign: "left", fontSize: "16px", lineHeight: "1.8" }}>
-                        <strong>{idx + 1}. </strong>
-                        <span
-                          dangerouslySetInnerHTML={{
-                            __html: renderMixedContent(displayContent)
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <View style={{ minHeight: 60 }}>
-                        <WebView
-                          originWhitelist={["*"]}
-                          source={{
-                            html: buildStepHtml(idx + 1, displayContent),
-                          }}
-                          style={{ flex: 1 }}
-                        />
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          ) : null}
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 4,
-            }}
+        {/* Image Upload Card */}
+        <TouchableOpacity
+          onPress={pickImage}
+          activeOpacity={0.8}
+          style={{ marginTop: 16 }}
+        >
+          <LinearGradient
+            colors={['#fa709a', '#fee140']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.uploadButton}
           >
-            <Text
-              style={{
-                fontWeight: "700",
-                fontSize: 18,
-                marginRight: 10,
+            <Ionicons name="camera" size={24} color="#fff" />
+            <Text style={styles.uploadButtonText}>Upload Math Problem</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Image Preview */}
+        {image && (
+          <View style={styles.imagePreviewCard}>
+            <Image
+              source={{ uri: image.uri }}
+              style={styles.imagePreview}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={() => {
+                setImage(null);
+                setResult(null);
+                setResultRaw(null);
               }}
             >
-              ✅ Final Answer:
-            </Text>
-            {result.answer ? (
-              typeof result.answer === "string" && looksLikeLatex(result.answer) ? (
+              <Ionicons name="close-circle" size={32} color="#ff6b6b" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* AI Provider Selection */}
+        {image && (
+          <View style={{ marginTop: 20 }}>
+            <Text style={styles.sectionTitle}>Choose AI Provider</Text>
+
+            <TouchableOpacity
+              onPress={() => send("/solve-gemini")}
+              disabled={loading}
+              activeOpacity={0.8}
+              style={{ marginTop: 12 }}
+            >
+              <LinearGradient
+                colors={['#4285f4', '#34a853']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.providerButton}
+              >
+                <MaterialCommunityIcons name="google" size={24} color="#fff" />
+                <Text style={styles.providerButtonText}>Solve with Gemini</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => send("/solve-perplexity")}
+              disabled={loading}
+              activeOpacity={0.8}
+              style={{ marginTop: 12 }}
+            >
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.providerButton}
+              >
+                <Ionicons name="flash" size={24} color="#fff" />
+                <Text style={styles.providerButtonText}>Solve with Perplexity</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => send("/solve-chatgpt")}
+              disabled={loading}
+              activeOpacity={0.8}
+              style={{ marginTop: 12 }}
+            >
+              <LinearGradient
+                colors={['#10a37f', '#1a7f64']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.providerButton}
+              >
+                <MaterialCommunityIcons name="robot" size={24} color="#fff" />
+                <Text style={styles.providerButtonText}>Solve with ChatGPT</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {loading && (
+          <ActivityIndicator size="large" style={{ marginTop: 18 }} />
+        )}
+
+        {result && (
+          <View style={styles.resultCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <Ionicons name="calculator" size={20} color="#667eea" />
+              <Text style={{ color: "#a0aec0", marginLeft: 8, fontSize: 14, fontWeight: '500' }}>Expression</Text>
+            </View>
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: "#ddd",
+                borderRadius: 8,
+                paddingVertical: 10,
+                paddingHorizontal: 10,
+                marginBottom: 10,
+                minHeight: 50,
+                justifyContent: "center",
+              }}
+            >
+              {result.latex ? (
                 Platform.OS === "web" ? (
-                  renderLatexWeb(String(result.answer), { fontSize: 20 }, false)
+                  renderLatexWeb(result.latex, {
+                    textAlign: "center",
+                    fontSize: 20,
+                    width: "100%",
+                  }, true) // Use display mode for better rendering
                 ) : (
-                  <View style={{ height: 56, width: "60%" }}>
+                  <View style={{ height: 60, width: "100%" }}>
                     <WebView
                       originWhitelist={["*"]}
-                      source={{ html: buildKaTeXHtml(String(result.answer), false) }}
-                      style={{ flex: 1, backgroundColor: 'transparent' }}
+                      source={{ html: buildKaTeXHtml(result.latex, true) }}
+                      style={{ flex: 1 }}
                     />
                   </View>
                 )
               ) : (
-                <Text style={{ fontSize: 20, fontWeight: "600", color: "#000" }}>
-                  {String(result.answer)}
+                <Text style={{ color: "#333" }}>
+                  {result.notes ?? "Expression"}
                 </Text>
-              )
-            ) : (
-              <Text style={{ fontSize: 18, color: "#999" }}>—</Text>
-            )}
-          </View>
+              )}
+            </View>
 
-          {result.notes ? (
-            <Text style={{ marginTop: 8, color: "#555" }}>
-              Notes: {result.notes}
+            <Text style={{ fontWeight: "700", marginBottom: 8 }}>
+              Let's solve it step-by-step:
             </Text>
-          ) : null}
-        </View>
-      )}
 
-      <View style={{ marginTop: 14 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ fontWeight: "700" }}>Raw response (debug)</Text>
-          <TouchableOpacity onPress={() => setShowRaw((v) => !v)}>
-            <Text style={{ color: "#0b79f7", fontWeight: "700" }}>
-              {showRaw ? "Hide" : "Show Raw Response (Debug)"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {result.steps && result.steps.length ? (
+              <View style={{ marginBottom: 12 }}>
+                {result.steps.map((s, idx) => {
+                  const stepText = s ?? "";
+                  let displayContent = stepText.trim();
 
-        {!showRaw ? (
-          <View
-            style={{
-              backgroundColor: "#fff",
-              padding: 10,
-              borderRadius: 6,
-              borderWidth: 1,
-              borderColor: "#eee",
-              marginTop: 8,
-            }}
-          >
-            <Text style={{ color: "#444" }}>{rawPreview()}</Text>
-          </View>
-        ) : (
-          <View
-            style={{
-              backgroundColor: "#f6f6f6",
-              padding: 12,
-              marginTop: 8,
-              borderRadius: 6,
-            }}
-          >
-            <Text
-              selectable
-              style={{ fontFamily: "monospace", fontSize: 12 }}
+                  // Clean up weird characters
+                  displayContent = displayContent.replace(/√/g, '\\sqrt');
+                  displayContent = displayContent.replace(/�/g, '');
+
+                  return (
+                    <View
+                      key={idx}
+                      style={{ marginBottom: 10, paddingLeft: 10 }}
+                    >
+                      {Platform.OS === "web" ? (
+                        <div style={{ textAlign: "left", fontSize: "16px", lineHeight: "1.8" }}>
+                          <strong>{idx + 1}. </strong>
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: renderMixedContent(displayContent)
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <View style={{ minHeight: 60 }}>
+                          <WebView
+                            originWhitelist={["*"]}
+                            source={{
+                              html: buildStepHtml(idx + 1, displayContent),
+                            }}
+                            style={{ flex: 1 }}
+                          />
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginTop: 4,
+              }}
             >
-              {JSON.stringify(resultRaw ?? { parsed: null, raw: null }, null, 2)}
-            </Text>
+              <Text
+                style={{
+                  fontWeight: "700",
+                  fontSize: 18,
+                  marginRight: 10,
+                }}
+              >
+                ✅ Final Answer:
+              </Text>
+              {result.answer ? (
+                typeof result.answer === "string" && looksLikeLatex(result.answer) ? (
+                  Platform.OS === "web" ? (
+                    renderLatexWeb(String(result.answer), { fontSize: 20 }, false)
+                  ) : (
+                    <View style={{ height: 56, width: "60%" }}>
+                      <WebView
+                        originWhitelist={["*"]}
+                        source={{ html: buildKaTeXHtml(String(result.answer), false) }}
+                        style={{ flex: 1, backgroundColor: 'transparent' }}
+                      />
+                    </View>
+                  )
+                ) : (
+                  <Text style={{ fontSize: 20, fontWeight: "600", color: "#000" }}>
+                    {String(result.answer)}
+                  </Text>
+                )
+              ) : (
+                <Text style={{ fontSize: 18, color: "#999" }}>—</Text>
+              )}
+            </View>
+
+            {result.notes ? (
+              <Text style={{ marginTop: 8, color: "#555" }}>
+                Notes: {result.notes}
+              </Text>
+            ) : null}
           </View>
         )}
-      </View>
-    </ScrollView>
+
+        <View style={{ marginTop: 14 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ fontWeight: "700" }}>Raw response (debug)</Text>
+            <TouchableOpacity onPress={() => setShowRaw((v) => !v)}>
+              <Text style={{ color: "#0b79f7", fontWeight: "700" }}>
+                {showRaw ? "Hide" : "Show Raw Response (Debug)"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {!showRaw ? (
+            <View
+              style={{
+                backgroundColor: "#fff",
+                padding: 10,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: "#eee",
+                marginTop: 8,
+              }}
+            >
+              <Text style={{ color: "#444" }}>{rawPreview()}</Text>
+            </View>
+          ) : (
+            <View
+              style={{
+                backgroundColor: "#f6f6f6",
+                padding: 12,
+                marginTop: 8,
+                borderRadius: 6,
+              }}
+            >
+              <Text
+                selectable
+                style={{ fontFamily: "monospace", fontSize: 12 }}
+              >
+                {JSON.stringify(resultRaw ?? { parsed: null, raw: null }, null, 2)}
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 10 },
+  container: {
+    padding: 20,
+  },
+  heroSection: {
+    marginBottom: 24,
+    overflow: 'hidden',
+    borderRadius: 20,
+  },
+  heroGradient: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardLabel: {
+    fontSize: 14,
+    color: '#a0aec0',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  modernInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  uploadButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 12,
+  },
+  imagePreviewCard: {
+    marginTop: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  providerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  providerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    flex: 1,
+    marginLeft: 12,
+  },
+  resultCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  loadingCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 24,
+    marginTop: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#a0aec0',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: '#fff',
+  },
   input: {
     borderWidth: 1,
     padding: 8,
     marginBottom: 12,
     borderRadius: 6,
     borderColor: "#aaa",
+    color: '#fff',
   },
 });

@@ -7,12 +7,14 @@ A full-stack application that solves mathematical problems from images using Lar
 
 ## Features
 
+- **Modern UI Design** - Beautiful glassmorphism interface with gradient cards and smooth animations
 - **Multi-LLM Support** - Choose between Google Gemini, Perplexity Sonar, or OpenAI ChatGPT
 - **Image-to-Solution** - Upload images of handwritten or printed math problems
 - **Step-by-Step Solutions** - Get detailed solving process with explanations
-- **LaTeX Rendering** - Beautiful mathematical expression display using MathJax
+- **LaTeX Rendering** - Beautiful mathematical expression display using KaTeX
 - **Cross-Platform Frontend** - Works on Web, iOS, and Android via React Native + Expo
-- **Dark/Light Mode** - Automatic theme support
+- **Dark Gradient Theme** - Professional dark blue gradient background with vibrant accent colors
+- **Icon-Enhanced Buttons** - Each AI provider has unique gradient colors and icons
 - **Robust JSON Parsing** - Handles various response formats from different LLM providers
 - **Debug Mode** - View raw API responses for troubleshooting
 
@@ -64,9 +66,11 @@ llm-math-solver/
 - **Expo Router** - File-based routing
 - **TypeScript** - Type safety
 - **React Navigation** - Navigation library
-- **MathJax 3** - LaTeX rendering engine
+- **KaTeX** - LaTeX rendering engine
 - **React Native WebView** - Native LaTeX display
 - **Expo Image Picker** - Gallery image selection
+- **Expo Linear Gradient** - Gradient backgrounds and buttons
+- **Expo Vector Icons** - Icon library (Ionicons, MaterialCommunityIcons)
 
 ### LLM APIs
 - **Google Gemini** - gemini-2.5-flash-image model
@@ -136,9 +140,17 @@ llm-math-solver/
 
 5. **Run the backend server**
 
+   **Option 1: Using the startup script (Recommended for Windows)**
+   ```bash
+   .\start_backend.bat
+   ```
+
+   **Option 2: Using uvicorn directly (ensure venv is activated)**
    ```bash
    uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
+
+   **Note**: If you encounter "Module not found" errors, make sure the virtual environment is activated and all dependencies are installed.
 
    The backend will be available at `http://localhost:8000`
 
