@@ -12,18 +12,30 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Clipboard,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { WebView } from "react-native-webview";
 
 /**
- * Single-file frontend that:
- * - uploads an image to your FastAPI backend
- * - receives parsed JSON from backend (may contain double-escaped LaTeX)
- * - cleans LaTeX and renders via MathJax (web) or WebView (native)
- *
- * Replace your existing index.tsx with this file.
+ * LLM Math Solver Frontend
+ * Features:
+ * - Type-safe TypeScript interfaces
+ * - Upload progress indicators
+ * - Copy-to-clipboard functionality
+ * - Optimized LaTeX rendering
+ * - Better error handling
  */
+
+// Type definitions
+type ImageAsset = {
+  uri: string;
+  width?: number;
+  height?: number;
+  type?: string;
+  fileSize?: number;
+  mimeType?: string;
+};
 
 type LLMResult = {
   latex?: string | null;
@@ -32,19 +44,43 @@ type LLMResult = {
   notes?: string | null;
 };
 
+type BackendResponse = {
+  raw: string | null;
+  parsed: LLMResult | null;
+  error?: string;
+  detail?: string;
+};
+
+type UploadStage = 'idle' | 'uploading' | 'processing' | 'complete' | 'error';
+
 export default function IndexScreen() {
-  const [image, setImage] = useState<any>(null);
-  const [resultRaw, setResultRaw] = useState<any>(null);
+  const [image, setImage] = useState<ImageAsset | null>(null);
+  const [resultRaw, setResultRaw] = useState<BackendResponse | null>(null);
   const [result, setResult] = useState<LLMResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
   const [backendUrl, setBackendUrl] = useState("http://localhost:8000");
   const [showRaw, setShowRaw] = useState(false);
-  const mathContainerRef = useRef<any>(null);
+  const mathContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Load MathJax in web
+  // Load MathJax in web with proper configuration
   useEffect(() => {
     if (Platform.OS !== "web") return;
     if ((window as any).MathJax) return;
+
+    // Configure MathJax BEFORE loading the script
+    (window as any).MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)'], ['$', '$']],
+        displayMath: [['\\[', '\\]'], ['$$', '$$']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+      }
+    };
+
     const s = document.createElement("script");
     s.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js";
     s.async = true;
@@ -208,6 +244,43 @@ export default function IndexScreen() {
     };
   };
 
+  // ------------------ Utility functions ------------------
+
+  /**
+   * Copy text to clipboard with user feedback
+   */
+  const copyToClipboard = async (text: string, label: string = "Text") => {
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(text);
+      } else {
+        Clipboard.setString(text);
+      }
+      Alert.alert("Copied", `${label} copied to clipboard!`);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      Alert.alert("Error", "Failed to copy to clipboard");
+    }
+  };
+
+  /**
+   * Get user-friendly status message based on upload stage
+   */
+  const getStatusMessage = (): string => {
+    switch (uploadStage) {
+      case 'uploading':
+        return 'Uploading image...';
+      case 'processing':
+        return 'AI is solving the problem...';
+      case 'complete':
+        return 'Complete!';
+      case 'error':
+        return 'An error occurred';
+      default:
+        return '';
+    }
+  };
+
   // ------------------ upload and handle backend response ------------------
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -319,6 +392,47 @@ export default function IndexScreen() {
       </head><body>${body}</body></html>`;
   };
 
+  // Build HTML for step with mixed text and LaTeX
+  const buildStepHtml = (stepNumber: number, content: string) => {
+    return `<!doctype html><html><head><meta charset="utf-8"/>
+      <script>
+        window.MathJax = {
+          tex: {
+            inlineMath: [['\\\\(', '\\\\)']],
+            displayMath: [['\\\\[', '\\\\]']],
+            processEscapes: true
+          },
+          startup: {
+            pageReady: () => {
+              return MathJax.startup.defaultPageReady().then(() => {
+                // Auto-adjust height
+                const height = document.body.scrollHeight;
+                window.ReactNativeWebView?.postMessage(JSON.stringify({ height }));
+              });
+            }
+          }
+        };
+      </script>
+      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+          padding: 8px;
+          margin: 0;
+          color: #222;
+          font-size: 15px;
+          line-height: 1.6;
+        }
+        strong { font-weight: 600; }
+        .mjx-chtml { display: inline !important; }
+      </style>
+    </head>
+    <body>
+      <strong>${stepNumber}.</strong> ${content}
+    </body>
+    </html>`;
+  };
+
   // Small preview for hidden raw
   const rawPreview = () => {
     if (!result) return "No result yet";
@@ -389,25 +503,52 @@ export default function IndexScreen() {
               {result.steps.map((s, idx) => {
                 const stepText = s ?? "";
                 const cleaned = cleanLatex(stepText) ?? stepText;
-                if (looksLikeLatex(cleaned)) {
-                  return (
-                    <View key={idx} style={{ marginBottom: 10 }}>
-                      {Platform.OS === "web" ? (
-                        renderLatexWeb(cleaned, { textAlign: "center" })
-                      ) : (
-                        <View style={{ height: 50 }}>
-                          <WebView originWhitelist={["*"]} source={{ html: buildMathHtml(cleaned) }} style={{ flex: 1 }} />
-                        </View>
-                      )}
-                    </View>
-                  );
-                } else {
-                  return (
-                    <View key={idx} style={{ marginBottom: 8 }}>
-                      <Text style={{ fontWeight: "600" }}>{idx + 1}. {stepText}</Text>
-                    </View>
-                  );
-                }
+
+                // Auto-wrap LaTeX expressions in the content with delimiters
+                // Replace patterns like \log_{5}, \frac{}, etc. with proper inline math delimiters
+                let displayContent = cleaned;
+
+                // First, handle spacing commands like \quad - replace with regular space
+                displayContent = displayContent.replace(/\\quad/g, ' ');
+                displayContent = displayContent.replace(/\\qquad/g, '  ');
+
+                // Wrap LaTeX commands in inline math delimiters \( \) for MathJax
+                // Match LaTeX commands and wrap them
+                displayContent = displayContent.replace(
+                  /(\\(?:log|frac|sqrt|times|div|cdot|pi|sum|int|partial|alpha|beta|gamma|delta|theta|lambda|mu|sigma|omega|infty|pm|mp|leq|geq|neq|approx|equiv|subset|supset|in|notin|forall|exists|nabla|partial|to|rightarrow|leftarrow|Rightarrow|Leftarrow|implies|iff)(?:_\{[^}]+\}|\^\{[^}]+\}|\{[^}]*\})*)/g,
+                  '\\($1\\)'
+                );
+
+                // Also handle standalone subscripts and superscripts with variables like x^2, x_{5}
+                displayContent = displayContent.replace(
+                  /\b([a-zA-Z])(\^\{[^}]+\}|_\{[^}]+\})/g,
+                  '\\($1$2\\)'
+                );
+
+                // Handle superscripts without braces like x^2 (not x^{2})
+                displayContent = displayContent.replace(
+                  /\b([a-zA-Z])\^(\d)/g,
+                  '\\($1^$2\\)'
+                );
+
+                return (
+                  <View key={idx} style={{ marginBottom: 10, paddingLeft: 10 }}>
+                    {Platform.OS === "web" ? (
+                      <div style={{ textAlign: "left", fontSize: "16px" }}>
+                        <strong>{idx + 1}. </strong>
+                        <span dangerouslySetInnerHTML={{ __html: displayContent }} />
+                      </div>
+                    ) : (
+                      <View style={{ minHeight: 60 }}>
+                        <WebView
+                          originWhitelist={["*"]}
+                          source={{ html: buildStepHtml(idx + 1, displayContent) }}
+                          style={{ flex: 1 }}
+                        />
+                      </View>
+                    )}
+                  </View>
+                );
               })}
             </View>
           ) : null}
