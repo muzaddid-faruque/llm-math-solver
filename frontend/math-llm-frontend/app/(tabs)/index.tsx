@@ -77,18 +77,18 @@ export default function IndexScreen() {
       const candidate = text.slice(first, last + 1);
       try {
         return JSON.parse(candidate);
-      } catch {}
+      } catch { }
       const cleaned = candidate.replace(/\\n/g, " ").replace(/\r/g, " ");
       try {
         return JSON.parse(cleaned);
-      } catch {}
+      } catch { }
     }
     const fence = /```(?:json)?\n?([\s\S]*?)```/i.exec(text);
     if (fence && fence[1]) {
       const inner = fence[1].trim();
       try {
         return JSON.parse(inner);
-      } catch {}
+      } catch { }
     }
     return null;
   };
@@ -133,7 +133,7 @@ export default function IndexScreen() {
       else {
         try {
           parsed = JSON.parse(parsed);
-        } catch {}
+        } catch { }
       }
     }
 
@@ -418,13 +418,11 @@ export default function IndexScreen() {
     if (!result) return "No result yet";
     if (result.answer) return `Answer: ${result.answer}`;
     if (result.latex)
-      return `Expression: ${String(result.latex).slice(0, 60)}${
-        String(result.latex).length > 60 ? "…" : ""
-      }`;
+      return `Expression: ${String(result.latex).slice(0, 60)}${String(result.latex).length > 60 ? "…" : ""
+        }`;
     if (result.steps && result.steps.length)
-      return `Step 1: ${result.steps[0].slice(0, 80)}${
-        result.steps[0].length > 80 ? "…" : ""
-      }`;
+      return `Step 1: ${result.steps[0].slice(0, 80)}${result.steps[0].length > 80 ? "…" : ""
+        }`;
     return "No parsed preview";
   };
 
@@ -466,7 +464,7 @@ export default function IndexScreen() {
     let processed = content;
 
     // Clean up encoding issues
-    processed = processed.replace(/√/g, '\\');
+    processed = processed.replace(/√/g, '\\sqrt');
 
     // First handle existing LaTeX delimiters
     processed = processed.replace(/\\\[(.*?)\\\]/gs, (match, latex) => {
@@ -502,15 +500,24 @@ export default function IndexScreen() {
       }
     });
 
-    // If no delimiters found, try to wrap the whole content if it looks mathy
-    if (!processed.includes('class="katex"') && /[_\^{}]|log|sin|cos|tan|frac|sqrt/.test(processed)) {
-      try {
-        return katex.renderToString(processed, { displayMode: false, throwOnError: false });
-      } catch {
-        // If full render fails, do nothing
-      }
-    }
+    // Handle inline LaTeX commands that aren't in delimiters
+    // Wrap sequences like \log_b, x^2, etc. while preserving surrounding text
+    processed = processed.replace(/(\\[a-zA-Z]+(?:_\{[^}]+\}|_[a-zA-Z0-9])?(?:\^?\{[^}]+\}|\^[a-zA-Z0-9])?|\w+\^?\{[^}]+\}|\w+\^[a-zA-Z0-9])/g, (match) => {
+      // Don't re-render if already rendered
+      if (match.includes('katex')) return match;
 
+      // Only render if it looks like LaTeX math notation
+      if (/\\[a-zA-Z]+|[_^]/.test(match)) {
+        try {
+          return katex.renderToString(match, { displayMode: false, throwOnError: false });
+        } catch {
+          return match;
+        }
+      }
+      return match;
+    });
+
+    // Don't auto-wrap entire content - text spacing is preserved
     return processed;
   };
 
@@ -623,7 +630,7 @@ export default function IndexScreen() {
                 let displayContent = stepText.trim();
 
                 // Clean up weird characters
-                displayContent = displayContent.replace(/√/g, '\\');
+                displayContent = displayContent.replace(/√/g, '\\sqrt');
                 displayContent = displayContent.replace(/�/g, '');
 
                 return (
