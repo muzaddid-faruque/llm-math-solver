@@ -30,7 +30,7 @@ jobs:
       - name: Lint backend
         run: |
           if [ -d backend ]; then
-            flake8 backend
+            cd backend && flake8 .
           else
             echo "No backend directory to lint"
           fi
