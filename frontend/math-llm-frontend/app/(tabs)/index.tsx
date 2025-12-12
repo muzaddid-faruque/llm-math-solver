@@ -374,7 +374,8 @@ export default function IndexScreen() {
             font-family:Arial;
             padding:10px;
             margin:0;
-            color:#111;
+            color:#fff;
+            background-color:transparent;
             display:flex;
             align-items:center;
             justify-content:center;
@@ -382,6 +383,9 @@ export default function IndexScreen() {
           }
           .katex-display {
             margin: 0;
+          }
+          .katex {
+            color: #fff;
           }
         </style>
         </head><body>${renderedHTML}</body></html>`;
@@ -395,6 +399,8 @@ export default function IndexScreen() {
   const buildStepHtml = (stepNumber: number, content: string) => {
     // Use the same rendering logic as web
     const processedContent = renderMixedContent(content);
+    // Check if content already starts with a number
+    const hasNumber = /^\d+\.\s/.test(content);
 
     return `<!doctype html><html><head><meta charset="utf-8"/>
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -403,15 +409,16 @@ export default function IndexScreen() {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
           padding: 8px;
           margin: 0;
-          color: #222;
+          color: #fff;
           font-size: 15px;
           line-height: 1.8;
+          background-color: transparent;
         }
         strong { font-weight: 600; }
       </style>
     </head>
     <body>
-      <strong>${stepNumber}.</strong> ${processedContent}
+      ${hasNumber ? '' : `<strong>${stepNumber}.</strong> `}${processedContent}
     </body>
     </html>`;
   };
@@ -449,6 +456,7 @@ export default function IndexScreen() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            color: '#fff',
           }}
           dangerouslySetInnerHTML={{ __html: html }}
         />
@@ -603,24 +611,6 @@ export default function IndexScreen() {
             <Text style={styles.sectionTitle}>Choose AI Provider</Text>
 
             <TouchableOpacity
-              onPress={() => send("/solve-gemini")}
-              disabled={loading}
-              activeOpacity={0.8}
-              style={{ marginTop: 12 }}
-            >
-              <LinearGradient
-                colors={['#4285f4', '#34a853']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.providerButton}
-              >
-                <MaterialCommunityIcons name="google" size={24} color="#fff" />
-                <Text style={styles.providerButtonText}>Solve with Gemini</Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" />
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
               onPress={() => send("/solve-perplexity")}
               disabled={loading}
               activeOpacity={0.8}
@@ -634,6 +624,24 @@ export default function IndexScreen() {
               >
                 <Ionicons name="flash" size={24} color="#fff" />
                 <Text style={styles.providerButtonText}>Solve with Perplexity</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => send("/solve-gemini")}
+              disabled={loading}
+              activeOpacity={0.8}
+              style={{ marginTop: 12 }}
+            >
+              <LinearGradient
+                colors={['#4285f4', '#34a853']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.providerButton}
+              >
+                <MaterialCommunityIcons name="google" size={24} color="#fff" />
+                <Text style={styles.providerButtonText}>Solve with Gemini</Text>
                 <Ionicons name="arrow-forward" size={20} color="#fff" />
               </LinearGradient>
             </TouchableOpacity>
@@ -697,13 +705,13 @@ export default function IndexScreen() {
                   </View>
                 )
               ) : (
-                <Text style={{ color: "#333" }}>
+                <Text style={{ color: "#e0e0e0" }}>
                   {result.notes ?? "Expression"}
                 </Text>
               )}
             </View>
 
-            <Text style={{ fontWeight: "700", marginBottom: 8 }}>
+            <Text style={{ fontWeight: "700", marginBottom: 8, color: "#fff" }}>
               Let's solve it step-by-step:
             </Text>
 
@@ -723,8 +731,8 @@ export default function IndexScreen() {
                       style={{ marginBottom: 10, paddingLeft: 10 }}
                     >
                       {Platform.OS === "web" ? (
-                        <div style={{ textAlign: "left", fontSize: "16px", lineHeight: "1.8" }}>
-                          <strong>{idx + 1}. </strong>
+                        <div style={{ textAlign: "left", fontSize: "16px", lineHeight: "1.8", color: "#fff" }}>
+                          {!displayContent.match(/^\d+\.\s/) && <strong>{idx + 1}. </strong>}
                           <span
                             dangerouslySetInnerHTML={{
                               __html: renderMixedContent(displayContent)
@@ -760,6 +768,7 @@ export default function IndexScreen() {
                   fontWeight: "700",
                   fontSize: 18,
                   marginRight: 10,
+                  color: "#fff",
                 }}
               >
                 ✅ Final Answer:
@@ -778,17 +787,17 @@ export default function IndexScreen() {
                     </View>
                   )
                 ) : (
-                  <Text style={{ fontSize: 20, fontWeight: "600", color: "#000" }}>
+                  <Text style={{ fontSize: 20, fontWeight: "600", color: "#fff" }}>
                     {String(result.answer)}
                   </Text>
                 )
               ) : (
-                <Text style={{ fontSize: 18, color: "#999" }}>—</Text>
+                <Text style={{ fontSize: 18, color: "#a0aec0" }}>—</Text>
               )}
             </View>
 
             {result.notes ? (
-              <Text style={{ marginTop: 8, color: "#555" }}>
+              <Text style={{ marginTop: 8, color: "#d0d0d0" }}>
                 Notes: {result.notes}
               </Text>
             ) : null}
@@ -803,7 +812,7 @@ export default function IndexScreen() {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontWeight: "700" }}>Raw response (debug)</Text>
+            <Text style={{ fontWeight: "700", color: "#fff" }}>Raw response (debug)</Text>
             <TouchableOpacity onPress={() => setShowRaw((v) => !v)}>
               <Text style={{ color: "#0b79f7", fontWeight: "700" }}>
                 {showRaw ? "Hide" : "Show Raw Response (Debug)"}
