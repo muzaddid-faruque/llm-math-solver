@@ -249,6 +249,25 @@ export default function IndexScreen() {
     }
   };
 
+  const takePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission", "Camera permission is required to take photos.");
+      return;
+    }
+    const res: any = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true,
+    });
+    if (!res.canceled) {
+      setImage(res.assets[0]);
+      setResult(null);
+      setResultRaw(null);
+      setShowRaw(false);
+    }
+  };
+
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -566,20 +585,37 @@ export default function IndexScreen() {
           />
         </View>
 
-        {/* Image Upload Card */}
+        {/* Take Photo Button */}
+        <TouchableOpacity
+          onPress={takePhoto}
+          activeOpacity={0.8}
+          style={{ marginTop: 16 }}
+        >
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fullWidthButton}
+          >
+            <Ionicons name="camera" size={24} color="#fff" />
+            <Text style={styles.fullWidthButtonText}>Take Photo</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Upload from Gallery Button */}
         <TouchableOpacity
           onPress={pickImage}
           activeOpacity={0.8}
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 12 }}
         >
           <LinearGradient
             colors={['#fa709a', '#fee140']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.uploadButton}
+            style={styles.fullWidthButton}
           >
-            <Ionicons name="camera" size={24} color="#fff" />
-            <Text style={styles.uploadButtonText}>Upload Math Problem</Text>
+            <Ionicons name="images" size={24} color="#fff" />
+            <Text style={styles.fullWidthButtonText}>Upload from Gallery</Text>
           </LinearGradient>
         </TouchableOpacity>
 
