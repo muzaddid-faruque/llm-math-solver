@@ -38,7 +38,9 @@ app.add_middleware(
 
 # File upload validation constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_MIMETYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"}
+ALLOWED_MIMETYPES = {
+    "image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"
+}
 
 # API Configuration
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
