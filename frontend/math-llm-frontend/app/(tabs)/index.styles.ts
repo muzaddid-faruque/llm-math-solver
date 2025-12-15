@@ -3,6 +3,9 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
     container: {
         padding: 20,
+        maxWidth: 800,
+        width: '100%',
+        alignSelf: 'center',
     },
     heroSection: {
         marginBottom: 24,
