@@ -39,6 +39,7 @@
 <td width="50%">
 
 ### 📐 **Smart Math Solving**
+- Camera capture for instant photos
 - Image-to-solution conversion
 - Step-by-step explanations
 - LaTeX rendering with KaTeX
@@ -123,7 +124,8 @@ npx expo start
 
 ```mermaid
 graph LR
-    A[📸 Upload Image] --> B[🔄 Send to Backend]
+    A1[📸 Take Photo] --> B[🔄 Send to Backend]
+    A2[🖼️ Upload Image] --> B
     B --> C{Choose AI Provider}
     C -->|Gemini| D[🤖 Google AI]
     C -->|Perplexity| E[🤖 Perplexity AI]
@@ -137,7 +139,7 @@ graph LR
 
 ### User Flow
 
-1. **Upload** - Select an image containing a math problem
+1. **Capture or Upload** - Take a photo directly with your camera OR upload an existing image
 2. **Choose** - Pick your preferred AI provider (Gemini/Perplexity/ChatGPT)
 3. **Process** - AI analyzes the image and solves the problem
 4. **View** - Get step-by-step solutions with beautifully rendered equations
