@@ -15,6 +15,7 @@ import * as ImagePicker from "expo-image-picker";
 import { WebView } from "react-native-webview";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import katex from "katex";
 import { styles } from './index.styles';
 
@@ -49,7 +50,9 @@ export default function IndexScreen() {
   const [result, setResult] = useState<LLMResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
-  const [backendUrl, setBackendUrl] = useState("http://localhost:8000");
+  const [backendUrl, setBackendUrl] = useState(
+    Constants.expoConfig?.extra?.backendUrl ?? "http://localhost:8000"
+  );
   const [showRaw, setShowRaw] = useState(false);
 
   // Load KaTeX CSS on web
