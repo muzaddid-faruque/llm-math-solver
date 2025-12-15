@@ -27,19 +27,20 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS Configuration - Use environment variable for allowed origins
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:19006").split(",")
+# CORS Configuration - Allow all origins for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],  # Allow all origins during development
     allow_credentials=False,
-    allow_methods=["POST", "GET"],
-    allow_headers=["Content-Type"],
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 # File upload validation constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_MIMETYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"}
+ALLOWED_MIMETYPES = {
+    "image/jpeg", "image/png", "image/webp", "image/gif", "image/jpg"
+}
 
 # API Configuration
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
@@ -56,6 +57,7 @@ Return ONLY a single JSON object with keys: "latex", "answer", "steps", "notes".
 - "notes": ambiguous interpretations if any
 Do not add any text outside the JSON.
 """
+
 
 def try_extract_json_from_text(text: str) -> Optional[Any]:
     """Try to find and parse the first JSON object inside text. Returns Python object or None."""
@@ -122,6 +124,8 @@ async def validate_and_read_image(file: UploadFile) -> bytes:
 # ---------------------------
 # Perplexity endpoint (Sonar) - image inside messages[].content as data URI
 # ---------------------------
+
+
 @app.post("/solve-perplexity")
 @limiter.limit("10/minute")
 async def solve_perplexity(request: Request, file: UploadFile = File(...)):
@@ -196,6 +200,8 @@ async def solve_perplexity(request: Request, file: UploadFile = File(...)):
 # ---------------------------
 # Gemini endpoint (using google-genai types.Part.from_bytes)
 # ---------------------------
+
+
 @app.post("/solve-gemini")
 @limiter.limit("10/minute")
 async def solve_gemini(request: Request, file: UploadFile = File(...)):
@@ -305,6 +311,8 @@ async def solve_gemini(request: Request, file: UploadFile = File(...)):
 # ---------------------------
 # New: ChatGPT / OpenAI endpoint
 # ---------------------------
+
+
 @app.post("/solve-chatgpt")
 @limiter.limit("10/minute")
 async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
@@ -343,9 +351,11 @@ async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
         {"role": "system", "content": LLM_PROMPT},
         {
             "role": "user",
-            "content": f"Image data (base64 data URI):\n{data_uri}\n\n" +
-                      "Please extract the math problem from the image and return ONLY " +
-                      "the single JSON object as specified by the system prompt."
+            "content": (
+                f"Image data (base64 data URI):\n{data_uri}\n\n"
+                "Please extract the math problem from the image and return ONLY "
+                "the single JSON object as specified by the system prompt."
+            )
         }
     ]
 
@@ -391,6 +401,8 @@ async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # ---------------------------
+
+
 @app.get("/")
 async def root():
     return {"message": "Backend running. POST to /solve-gemini or /solve-perplexity or /solve-chatgpt"}

@@ -159,4 +159,23 @@ export const styles = StyleSheet.create({
         borderColor: "#aaa",
         color: '#fff',
     },
+    fullWidthButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+        width: '100%',
+    },
+    fullWidthButtonText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#fff',
+        marginLeft: 12,
+    },
 });
