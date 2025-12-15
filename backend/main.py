@@ -58,6 +58,7 @@ Return ONLY a single JSON object with keys: "latex", "answer", "steps", "notes".
 Do not add any text outside the JSON.
 """
 
+
 def try_extract_json_from_text(text: str) -> Optional[Any]:
     """Try to find and parse the first JSON object inside text. Returns Python object or None."""
     if not text or not isinstance(text, str):
@@ -123,6 +124,8 @@ async def validate_and_read_image(file: UploadFile) -> bytes:
 # ---------------------------
 # Perplexity endpoint (Sonar) - image inside messages[].content as data URI
 # ---------------------------
+
+
 @app.post("/solve-perplexity")
 @limiter.limit("10/minute")
 async def solve_perplexity(request: Request, file: UploadFile = File(...)):
@@ -197,6 +200,8 @@ async def solve_perplexity(request: Request, file: UploadFile = File(...)):
 # ---------------------------
 # Gemini endpoint (using google-genai types.Part.from_bytes)
 # ---------------------------
+
+
 @app.post("/solve-gemini")
 @limiter.limit("10/minute")
 async def solve_gemini(request: Request, file: UploadFile = File(...)):
@@ -306,6 +311,8 @@ async def solve_gemini(request: Request, file: UploadFile = File(...)):
 # ---------------------------
 # New: ChatGPT / OpenAI endpoint
 # ---------------------------
+
+
 @app.post("/solve-chatgpt")
 @limiter.limit("10/minute")
 async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
@@ -344,9 +351,11 @@ async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
         {"role": "system", "content": LLM_PROMPT},
         {
             "role": "user",
-            "content": f"Image data (base64 data URI):\n{data_uri}\n\n" +
-                      "Please extract the math problem from the image and return ONLY " +
-                      "the single JSON object as specified by the system prompt."
+            "content": (
+                f"Image data (base64 data URI):\n{data_uri}\n\n"
+                "Please extract the math problem from the image and return ONLY "
+                "the single JSON object as specified by the system prompt."
+            )
         }
     ]
 
@@ -392,6 +401,8 @@ async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 # ---------------------------
+
+
 @app.get("/")
 async def root():
     return {"message": "Backend running. POST to /solve-gemini or /solve-perplexity or /solve-chatgpt"}
