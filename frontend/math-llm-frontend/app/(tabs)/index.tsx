@@ -555,7 +555,16 @@ export default function IndexScreen() {
       colors={['#0f0f23', '#1a1a2e', '#16213e']}
       style={{ flex: 1 }}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          Platform.OS === 'web' && {
+            maxWidth: 600,
+            alignSelf: 'center',
+            width: '100%',
+          }
+        ]}
+      >
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <LinearGradient
