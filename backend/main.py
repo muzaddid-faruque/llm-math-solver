@@ -6,6 +6,8 @@ import logging
 from typing import Optional, Any
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 import requests
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -403,6 +405,31 @@ async def solve_chatgpt(request: Request, file: UploadFile = File(...)):
 # ---------------------------
 
 
-@app.get("/")
-async def root():
-    return {"message": "Backend running. POST to /solve-gemini or /solve-perplexity or /solve-chatgpt"}
+# ---------------------------
+
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """
+    Serve the frontend static files (SPA).
+    If a file exists, serve it. Otherwise, serve index.html.
+    """
+    # Define the static directory (mapped in Dockerfile)
+    static_dir = os.path.join(os.getcwd(), "static")
+    
+    if os.path.isdir(static_dir):
+        # 1. Try to serve exact file from static directory
+        target_file = os.path.join(static_dir, full_path)
+        if os.path.exists(target_file) and os.path.isfile(target_file):
+            return FileResponse(target_file)
+        
+        # 2. SPA Fallback: serve index.html for client-side routing
+        index_file = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+    
+    # Fallback message if static files are not present (e.g. local dev)
+    return {
+        "message": "Backend running. POST to /solve-gemini or /solve-perplexity. Static files not found (dev mode)."
+    }
+

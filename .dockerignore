@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.dockerignore
+venv
+__pycache__
+*.pyc
+.env
+.DS_Store
+backend/venv
+frontend/math-llm-frontend/node_modules
+dist
+web-build
