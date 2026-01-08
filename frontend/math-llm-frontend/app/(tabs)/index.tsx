@@ -49,7 +49,9 @@ export default function IndexScreen() {
   const [result, setResult] = useState<LLMResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadStage, setUploadStage] = useState<UploadStage>("idle");
-  const [backendUrl, setBackendUrl] = useState("http://localhost:8000");
+  const [backendUrl, setBackendUrl] = useState(
+    Platform.OS === 'web' ? "" : "http://localhost:8000"
+  );
   const [showRaw, setShowRaw] = useState(false);
 
   // Load KaTeX CSS on web
@@ -579,20 +581,22 @@ export default function IndexScreen() {
           </LinearGradient>
         </View>
 
-        {/* Backend URL Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="server-outline" size={20} color="#a0aec0" />
-            <Text style={styles.cardLabel}>Backend URL</Text>
+        {/* Backend URL Card - Hidden on Web */}
+        {Platform.OS !== 'web' && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="server-outline" size={20} color="#a0aec0" />
+              <Text style={styles.cardLabel}>Backend URL</Text>
+            </View>
+            <TextInput
+              value={backendUrl}
+              onChangeText={setBackendUrl}
+              style={styles.modernInput}
+              placeholderTextColor="#718096"
+              placeholder="http://localhost:8000"
+            />
           </View>
-          <TextInput
-            value={backendUrl}
-            onChangeText={setBackendUrl}
-            style={styles.modernInput}
-            placeholderTextColor="#718096"
-            placeholder="http://localhost:8000"
-          />
-        </View>
+        )}
 
         {/* Take Photo Button */}
         <TouchableOpacity
